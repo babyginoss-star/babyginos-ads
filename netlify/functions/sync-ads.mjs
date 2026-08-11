@@ -15,7 +15,7 @@ import { evaluateAd, classifyFunnel, CONFIG } from "./lib/rules.mjs";
 import { sendTelegram, buildDigest } from "./lib/telegram.mjs";
 
 // Programación: todos los días a las 11:00 UTC (~08:00 en Argentina)
-export const config = { schedule: "0 11 * * *" };
+export const config = { schedule: "5 2 * * *" };
 
 export default async function handler() {
   const {
