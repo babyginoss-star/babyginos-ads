@@ -1,0 +1,9 @@
+{
+  "name": "babyginos-ads-reader",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Lector automatizado de anuncios de Meta para Baby Ginos (solo lectura)",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

@@ -1,0 +1,6 @@
+[build]
+  functions = "netlify/functions"
+
+# La programación (schedule) ya está declarada dentro de sync-ads.mjs
+# con: export const config = { schedule: "0 11 * * *" }
+# No hace falta repetirla acá.
