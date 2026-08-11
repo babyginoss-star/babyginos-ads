@@ -19,11 +19,11 @@ export const handler = async (event) => {
   const { data, error } = await supabase
     .from("ads")
     .select("*")
-    .order("spend", { ascending: false });
+    .limit(3);
 
   if (error) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
   }
 
-  return { statusCode: 200, headers, body: JSON.stringify({ ads: data }) };
+  return { statusCode: 200, headers, body: JSON.stringify({ cols: data.length ? Object.keys(data[0]) : [], sample: data }) };
 };
