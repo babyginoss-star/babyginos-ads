@@ -19,26 +19,88 @@ export const CONFIG = {
   CPM_RISE_PCT: 0.15,        // CPM subiendo 15%+
   SIGNALS_TO_FLAG: 2,        // con 2 de 3 en rojo => FATIGANDO
 
-  // Umbral de "ganador": costo por resultado por debajo de tu tope
-  CPA_MAX: 9999,             // <-- PONÉ ACÁ tu CPA máximo real de Baby Ginos
+  // Semáforo de CPA de Baby Ginos (en pesos):
+  //   verde  => escalable / rentable
+  //   amarillo => aceptable, vigilar
+  //   rojo   => no rentable
+  CPA_VERDE: 45000,          // CPA <= 45k  => verde
+  CPA_AMARILLO: 55000,       // 45k < CPA <= 55k => amarillo ; CPA > 55k => rojo
+  CPA_MAX: 45000,            // tope para considerar un anuncio "escalable" en el 4Pi
+};
+
+/** Devuelve el color del CPA según el semáforo de Baby Ginos. */
+export function cpaColor(cpa) {
+  if (cpa == null) return "gris";
+  if (cpa <= CONFIG.CPA_VERDE) return "verde";
+  if (cpa <= CONFIG.CPA_AMARILLO) return "amarillo";
+  return "rojo";
+}
+
+// Umbrales del Método 4Pi (Prof. Charley T) — clasificación por comportamiento real
+export const P4 = {
+  FREQ_TOFU_MAX: 1.5,   // frecuencia ≤ 1.5 => alcance a gente nueva (TOFU)
+  FREQ_BOFU_MIN: 2.5,   // frecuencia ≥ 2.5 => mismas personas repetidas (BOFU)
+  CPM_HIGH: null,       // se calcula dinámico (mediana de la cuenta) si queda null
 };
 
 /**
- * Clasifica el funnel del anuncio.
- * Prioridad: 1) convención de nombres  2) objetivo de campaña.
+ * Clasifica el funnel del anuncio con el MÉTODO 4Pi.
+ * NO usa el nombre de la campaña: lee cómo el algoritmo USA el anuncio,
+ * a partir de sus métricas reales (frecuencia = señal principal; CPM y CPA confirman).
+ *
+ * @param metrics { frequency, cpm, cost_per_result, spend }
+ * @param ctx     { cpmMedian }  mediana de CPM de la cuenta, para comparar alto/bajo
  */
-export function classifyFunnel({ ad_name = "", campaign_name = "", objective = "" }) {
-  const txt = `${campaign_name} ${ad_name}`.toUpperCase();
+export function classifyFunnel(metrics = {}, ctx = {}) {
+  const freq = Number(metrics.frequency) || 0;
+  const cpm = Number(metrics.cpm) || 0;
+  const cpa = metrics.cost_per_result != null ? Number(metrics.cost_per_result) : null;
+  const spend = Number(metrics.spend) || 0;
+  const cpmMedian = ctx.cpmMedian || null;
 
-  // Lógica de Baby Ginos: el fondo de embudo (BOF) es lo ÚNICO que se etiqueta
-  // explícitamente (conversión / retargeting). Todo lo demás es prospecting (TOF),
-  // aunque sea una campaña de producto sin la etiqueta [PROSPECCION].
-  // El nombre manda: en prospecting el objetivo también es OUTCOME_SALES.
-  if (/CONVERSION|CONVERSIÓN|RETARGET|REMARKETING|RTG|\bBOF\b/.test(txt)) return "BOF";
-  if (/CONSIDERAC|MIDDLE|\bMOF\b/.test(txt)) return "MOF";
+  // Paso 1: sin gasto suficiente, no hay señal confiable
+  if (spend <= 0) return "SIN_DATOS";
 
-  // Todo lo que no sea explícitamente BOF/MOF => prospecting
-  return "TOF";
+  // Paso 2: la frecuencia da la posición tentativa en el embudo
+  let funnel;
+  if (freq <= P4.FREQ_TOFU_MAX) funnel = "TOFU";
+  else if (freq >= P4.FREQ_BOFU_MIN) funnel = "BOFU";
+  else funnel = "MOFU";
+
+  // Paso 3: el CPM confirma o contradice. Si tenemos mediana de la cuenta:
+  //   CPM claramente por debajo de la mediana refuerza TOFU (audiencia fría/amplia)
+  //   CPM claramente por encima refuerza BOFU (audiencia acotada/competida)
+  if (cpmMedian && cpm > 0) {
+    const alto = cpm > cpmMedian * 1.3;
+    const bajo = cpm < cpmMedian * 0.7;
+    if (funnel === "MOFU" && bajo) funnel = "TOFU";
+    if (funnel === "MOFU" && alto) funnel = "BOFU";
+  }
+
+  return funnel;
+}
+
+/** Diagnóstico 4Pi legible: qué está pasando con el anuncio y qué hacer. */
+export function diagnose4Pi(metrics = {}, ctx = {}) {
+  const freq = Number(metrics.frequency) || 0;
+  const cpa = metrics.cost_per_result != null ? Number(metrics.cost_per_result) : null;
+  const funnel = classifyFunnel(metrics, ctx);
+  const color = cpaColor(cpa);          // verde | amarillo | rojo | gris
+  const cpaBueno = color === "verde";   // "escalable" solo si CPA en verde
+
+  if (funnel === "SIN_DATOS")
+    return { funnel, cpaColor: color, diag: "Sin gasto suficiente — datos no confiables." };
+
+  if (freq <= P4.FREQ_TOFU_MAX) {
+    if (color === "verde") return { funnel, cpaColor: color, diag: "TOFU escalable ✅ — convierte en frío, pisá el acelerador." };
+    if (color === "amarillo") return { funnel, cpaColor: color, diag: "TOFU aceptable 🟡 — rinde en frío pero el CPA está al límite, vigilar." };
+    return { funnel, cpaColor: color, diag: "TOFU 🔴 — la creatividad no conecta con frío, revisar." };
+  }
+  if (freq >= P4.FREQ_BOFU_MIN) {
+    if (cpaBueno) return { funnel, cpaColor: color, diag: "BOFU — convierte bien pero NO escala en frío (audiencia caliente)." };
+    return { funnel, cpaColor: color, diag: "BOFU agotado ⚠️ — audiencia saturada, rotar/reejecutar." };
+  }
+  return { funnel, cpaColor: color, diag: "MOFU — zona de consideración, seguir de cerca." };
 }
 
 // Promedio simple de un campo sobre un set de snapshots
@@ -52,11 +114,21 @@ function avg(rows, field) {
  * Evalúa un anuncio a partir de TODOS sus snapshots (ordenados por día asc).
  * Devuelve { funnel, status, baseline, actual, señales, mensaje }.
  */
-export function evaluateAd(ad, snapshots) {
+export function evaluateAd(ad, snapshots, ctx = {}) {
   const snaps = [...snapshots].sort((a, b) => (a.day < b.day ? -1 : 1));
   const totalDays = snaps.length;
 
-  const funnel = ad.funnel || classifyFunnel(ad);
+  // Métricas recientes para el 4Pi
+  const recent4 = snaps.slice(-CONFIG.SHORT_WINDOW_DAYS);
+  const freqReciente = Math.max(...snaps.slice(-CONFIG.FREQ_WINDOW_DAYS).map((r) => Number(r.frequency) || 0), 0);
+  const metrics4pi = {
+    frequency: freqReciente,
+    cpm: avg(recent4, "cpm"),
+    cost_per_result: avg(recent4, "cost_per_result"),
+    spend: snaps.reduce((a, r) => a + (Number(r.spend) || 0), 0),
+  };
+  // Funnel por MÉTODO 4Pi (comportamiento real del anuncio, no la campaña)
+  const { funnel, diag: diag4pi } = diagnose4Pi(metrics4pi, ctx);
 
   // Todavía no hay data suficiente para juzgar
   if (totalDays < CONFIG.MIN_DAYS_TO_JUDGE) {

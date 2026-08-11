@@ -14,8 +14,8 @@ import { fetchDailyInsights, extractResults } from "./lib/meta.mjs";
 import { evaluateAd, classifyFunnel, CONFIG } from "./lib/rules.mjs";
 import { sendTelegram, buildDigest } from "./lib/telegram.mjs";
 
-// Programación: todos los días a las 11:00 UTC (~08:00 en Argentina)
-export const config = { schedule: "5 2 * * *" };
+// Programación: todos los días a las 03:00 UTC = 00:00 (medianoche) en Argentina (UTC-3)
+export const config = { schedule: "0 3 * * *" };
 
 export default async function handler() {
   const {
@@ -64,7 +64,8 @@ export default async function handler() {
         ad_name: r.ad_name,
         campaign_name: r.campaign_name,
         objective: r.objective,
-        funnel: classifyFunnel(r),
+        // el funnel NO se decide acá: lo calcula el Método 4Pi en la evaluación,
+        // a partir del comportamiento real (frecuencia/CPM/CPA) del anuncio.
         updated_at: new Date().toISOString(),
       });
     }
@@ -76,9 +77,14 @@ export default async function handler() {
   if (snapshots.length)
     await supabase.from("ad_snapshots").upsert(snapshots, { onConflict: "ad_id,day" });
 
-  // ---- 3. Evaluar cada anuncio con el motor de reglas ----
+  // ---- 3. Evaluar cada anuncio con el motor de reglas (Método 4Pi) ----
   const { data: ads } = await supabase.from("ads").select("*");
   const evaluated = [];
+
+  // Contexto 4Pi: mediana de CPM de la cuenta (para saber qué es "alto/bajo")
+  const cpms = snapshots.map((s) => Number(s.cpm)).filter((n) => n > 0).sort((a, b) => a - b);
+  const cpmMedian = cpms.length ? cpms[Math.floor(cpms.length / 2)] : null;
+  const ctx = { cpmMedian, cpaMax: Number(process.env.CPA_MAX) || CONFIG.CPA_MAX };
 
   for (const ad of ads || []) {
     const { data: snaps } = await supabase
@@ -87,7 +93,7 @@ export default async function handler() {
       .eq("ad_id", ad.ad_id)
       .order("day", { ascending: true });
 
-    const result = evaluateAd(ad, snaps || []);
+    const result = evaluateAd(ad, snaps || [], ctx);
 
     // Congelar baseline la primera vez que hay data suficiente
     const patch = { status: result.status, funnel: result.funnel, updated_at: new Date().toISOString() };
