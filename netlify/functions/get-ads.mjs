@@ -18,7 +18,7 @@ export const handler = async (event) => {
 
   const { data, error } = await supabase
     .from("ads")
-    .select("id, name, status, funnel, spend, impressions, reach, frequency, clicks, ctr, cpc, cpm, cpp, purchases, purchase_value, roas, cpa, created_at, updated_at")
+    .select("*")
     .order("spend", { ascending: false });
 
   if (error) {
