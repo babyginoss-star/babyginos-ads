@@ -1,9 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  if (req.method === "OPTIONS") return res.status(200).end();
+export const handler = async (event) => {
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Content-Type": "application/json"
+  };
+
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 200, headers, body: "" };
+  }
 
   const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -15,7 +21,9 @@ export default async function handler(req, res) {
     .select("id, name, status, funnel, spend, impressions, reach, frequency, clicks, ctr, cpc, cpm, cpp, purchases, purchase_value, roas, cpa, created_at, updated_at")
     .order("spend", { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
+  }
 
-  return res.status(200).json({ ads: data });
-}
+  return { statusCode: 200, headers, body: JSON.stringify({ ads: data }) };
+};
