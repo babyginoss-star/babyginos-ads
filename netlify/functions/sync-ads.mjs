@@ -5,7 +5,7 @@
 //   1. baja métricas diarias de Meta (últimos 14 días)
 //   2. guarda/actualiza en Supabase (ads + ad_snapshots)
 //   3. corre el motor de reglas (funnel + fatiga)
-//   4. manda el resumen por Telegram
+//   4. mhanda el resumen por Telegram
 //
 //  Todas las llaves viven en variables de entorno (Netlify), NUNCA en el código.
 
@@ -15,8 +15,7 @@ import { evaluateAd, classifyFunnel, CONFIG } from "./lib/rules.mjs";
 import { sendTelegram, buildDigest } from "./lib/telegram.mjs";
 
 // Programación: todos los días a las 03:00 UTC = 00:00 (medianoche) en Argentina (UTC-3)
-export const config = { schedule: "17 21 * * *" };
-
+export const config = { schedule: "5 2 * * *" };
 export default async function handler() {
   const {
     META_ACCESS_TOKEN,
