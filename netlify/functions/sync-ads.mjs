@@ -4,8 +4,9 @@
 // Flujo:
 // 1. baja métricas diarias de Meta (últimos 14 días)
 // 2. guarda/actualiza en Supabase (ads + ad_snapshots)
-// 3. corre el motor de reglas (Método 4Pi)
-// 4. manda el resumen por Telegram
+// 3. trae thumbnails de Meta y los guarda
+// 4. corre el motor de reglas (Método 4Pi)
+// 5. manda el resumen por Telegram
 //
 // Todas las llaves viven en variables de entorno (Netlify), NUNCA en el código.
 
@@ -14,6 +15,7 @@ import { fetchDailyInsights, extractResults } from "./lib/meta.mjs";
 import { evaluateAd, CONFIG } from "./lib/rules.mjs";
 import { sendTelegram, buildDigest } from "./lib/telegram.mjs";
 
+// Horario: 02:05 AM Argentina (05:05 UTC)
 export const config = { schedule: "5 2 * * *" };
 export default async function handler() {
   const {
@@ -72,7 +74,35 @@ export default async function handler() {
   if (snapshots.length)
     await supabase.from("ad_snapshots").upsert(snapshots, { onConflict: "ad_id,day" });
 
-  // ---- 3. Evaluar con Método 4Pi ----
+  // ---- 3. Traer thumbnails de Meta (en lotes de 50) ----
+  const adIds = [...adsSeen.keys()];
+  const thumbnailMap = {};
+  const BATCH = 50;
+
+  for (let i = 0; i < adIds.length; i += BATCH) {
+    const batch = adIds.slice(i, i + BATCH);
+    const ids = batch.join(",");
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/?ids=${ids}&fields=creative{thumbnail_url}&access_token=${META_ACCESS_TOKEN}`
+      );
+      const data = await res.json();
+      for (const [adId, adData] of Object.entries(data)) {
+        thumbnailMap[adId] = adData?.creative?.thumbnail_url || null;
+      }
+    } catch (e) {
+      console.error("Error fetching thumbnails batch:", e.message);
+    }
+  }
+
+  // Guardar thumbnails en ads
+  for (const [adId, url] of Object.entries(thumbnailMap)) {
+    if (url) {
+      await supabase.from("ads").update({ thumbnail_url: url }).eq("ad_id", adId);
+    }
+  }
+
+  // ---- 4. Evaluar con Método 4Pi ----
   const { data: ads } = await supabase.from("ads").select("*");
 
   // Gasto total acumulado por anuncio
@@ -81,7 +111,7 @@ export default async function handler() {
     adTotalSpend[s.ad_id] = (adTotalSpend[s.ad_id] || 0) + s.spend;
   }
 
-  // Promedio de gasto por campaña (para detectar gastoAlto)
+  // Promedio de gasto por campaña
   const campaignSpendMap = {};
   for (const [adId, adMeta] of adsSeen) {
     const camp = adMeta.campaign_name;
@@ -116,7 +146,6 @@ export default async function handler() {
       updated_at: new Date().toISOString(),
     };
 
-    // Cada 7 días, rotar el estado anterior
     if (daysSincePrev >= 7) {
       patch.prev_status = ad.status || null;
       patch.prev_funnel = ad.funnel || null;
@@ -127,7 +156,7 @@ export default async function handler() {
     evaluated.push({ ad_id: ad.ad_id, ad_name: ad.ad_name, ...result });
   }
 
-  // ---- 4. Resumen por Telegram ----
+  // ---- 5. Resumen por Telegram ----
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
     await sendTelegram({
       botToken: TELEGRAM_BOT_TOKEN,
