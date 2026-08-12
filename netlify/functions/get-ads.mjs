@@ -3,56 +3,72 @@ import { createClient } from "@supabase/supabase-js";
 export const handler = async (event) => {
   const headers = {
     "Access-Control-Allow-Origin": "*",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
   };
   if (event.httpMethod === "OPTIONS") return { statusCode: 200, headers, body: "" };
 
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+  );
 
+  // Fetch ads with prev fields + campaign
   const [{ data: ads, error: e1 }, { data: snaps, error: e2 }] = await Promise.all([
-    supabase.from("ads").select("ad_id, ad_name, campaign_name, funnel, status, updated_at"),
-    supabase.from("ad_snapshots").select("ad_id, spend, cpm, frequency, ctr, impressions, reach, results, cost_per_result")
+    supabase.from("ads").select(
+      "ad_id, ad_name, campaign_name, funnel, status, prev_status, prev_funnel, prev_evaluated_at, updated_at"
+    ),
+    supabase.from("ad_snapshots").select(
+      "ad_id, spend, cpm, frequency, impressions, reach, results, cost_per_result"
+    ),
   ]);
 
-  if (e1) return { statusCode: 500, headers, body: JSON.stringify({ error: e1.message }) };
-  if (e2) return { statusCode: 500, headers, body: JSON.stringify({ error: e2.message }) };
-
-  // Agregar snapshots por ad_id
-  const agg = {};
-  for (const s of snaps) {
-    if (!agg[s.ad_id]) agg[s.ad_id] = { spend: 0, impressions: 0, reach: 0, results: 0, cpm_sum: 0, freq_sum: 0, ctr_sum: 0, count: 0 };
-    const a = agg[s.ad_id];
-    a.spend += s.spend || 0;
-    a.impressions += s.impressions || 0;
-    a.reach += s.reach || 0;
-    a.results += s.results || 0;
-    a.cpm_sum += s.cpm || 0;
-    a.freq_sum += s.frequency || 0;
-    a.ctr_sum += s.ctr || 0;
-    a.count++;
+  if (e1 || e2) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: (e1 || e2).message }),
+    };
   }
 
-  const result = ads.map(ad => {
-    const a = agg[ad.ad_id] || {};
-    const n = a.count || 1;
-    const cpa = a.results > 0 ? a.spend / a.results : null;
+  // Aggregate snapshots per ad
+  const snapMap = {};
+  for (const s of snaps || []) {
+    if (!snapMap[s.ad_id]) {
+      snapMap[s.ad_id] = { spend: 0, impressions: 0, reach: 0, results: 0, cpms: [], freqs: [] };
+    }
+    const m = snapMap[s.ad_id];
+    m.spend += Number(s.spend) || 0;
+    m.impressions += Number(s.impressions) || 0;
+    m.reach += Number(s.reach) || 0;
+    m.results += Number(s.results) || 0;
+    if (s.cpm) m.cpms.push(Number(s.cpm));
+    if (s.frequency) m.freqs.push(Number(s.frequency));
+  }
+
+  const result = (ads || []).map((ad) => {
+    const m = snapMap[ad.ad_id] || { spend: 0, impressions: 0, reach: 0, results: 0, cpms: [], freqs: [] };
+    const avgCPM = m.cpms.length ? m.cpms.reduce((a, b) => a + b, 0) / m.cpms.length : null;
+    const maxFreq = m.freqs.length ? Math.max(...m.freqs) : null;
+    const cpa = m.results > 0 ? m.spend / m.results : null;
     return {
       ad_id: ad.ad_id,
       name: ad.ad_name,
       campaign: ad.campaign_name,
       funnel: ad.funnel,
       status: ad.status,
-      spend: a.spend || 0,
-      impressions: a.impressions || 0,
-      reach: a.reach || 0,
-      results: a.results || 0,
-      cpm: a.count ? a.cpm_sum / n : null,
-      frequency: a.count ? a.freq_sum / n : null,
-      ctr: a.count ? a.ctr_sum / n : null,
+      prev_status: ad.prev_status,
+      prev_funnel: ad.prev_funnel,
+      prev_evaluated_at: ad.prev_evaluated_at,
+      spend: m.spend,
+      impressions: m.impressions,
+      reach: m.reach,
+      results: m.results,
+      cpm: avgCPM,
+      frequency: maxFreq,
       cpa,
-      updated_at: ad.updated_at
+      updated_at: ad.updated_at,
     };
-  }).sort((a, b) => (b.spend || 0) - (a.spend || 0));
+  }).sort((a, b) => b.spend - a.spend);
 
   return { statusCode: 200, headers, body: JSON.stringify({ ads: result }) };
 };
