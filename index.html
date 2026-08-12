@@ -46,7 +46,6 @@
     .table-wrap { overflow-x: auto; padding: 0 24px 32px; }
     table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-top: 16px; }
 
-    /* Header row: sort labels */
     thead tr.header-labels th {
       background: #f0f0f5;
       text-align: left;
@@ -59,9 +58,10 @@
       user-select: none;
     }
     thead tr.header-labels th:hover { background: #e5e5ea; }
+    thead tr.header-labels th.no-sort { cursor: default; }
+    thead tr.header-labels th.no-sort:hover { background: #f0f0f5; }
     th .sort-icon { margin-left: 4px; opacity: .5; }
 
-    /* Filter row */
     thead tr.header-filters th {
       background: #fafafa;
       padding: 6px 8px;
@@ -80,12 +80,32 @@
     thead tr.header-filters input::placeholder { color: #bbb; }
 
     td {
-      padding: 9px 12px;
+      padding: 8px 12px;
       font-size: 13px;
       border-top: 1px solid #f0f0f0;
       white-space: nowrap;
+      vertical-align: middle;
     }
     tr:hover td { background: #fafafa; }
+
+    /* Thumbnail */
+    .ad-thumb {
+      width: 48px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 6px;
+      display: block;
+    }
+    .thumb-placeholder {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      background: #e5e5ea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
 
     /* Estado badges */
     .badge {
@@ -100,7 +120,6 @@
     .badge-no_suma     { background: #fde8e8; color: #b91c1c; }
     .badge-sin_evaluar { background: #f0f0f0; color: #777; }
 
-    /* CPA semáforo */
     .cpa-verde    { color: #1a6e2e; font-weight: 600; }
     .cpa-amarillo { color: #8a5700; font-weight: 600; }
     .cpa-rojo     { color: #c0392b; font-weight: 600; }
@@ -126,8 +145,8 @@
   <div class="loading" id="loading">Cargando ads…</div>
   <table id="ads-table" style="display:none">
     <thead>
-      <!-- Fila 1: labels + sort -->
       <tr class="header-labels">
+        <th class="no-sort">Creativo</th>
         <th onclick="sortBy('name')">Nombre <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('campaign')">Campaña <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('status')">Estado actual <span class="sort-icon">↕</span></th>
@@ -138,8 +157,8 @@
         <th onclick="sortBy('cpa')">CPA <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('results')">Compras <span class="sort-icon">↕</span></th>
       </tr>
-      <!-- Fila 2: filtros inline -->
       <tr class="header-filters">
+        <th></th>
         <th><input type="text" id="f-name" placeholder="buscar…" oninput="renderTable()" /></th>
         <th><select id="f-campaign" onchange="renderTable()"><option value="">Todas</option></select></th>
         <th>
@@ -160,9 +179,7 @@
             <option value="sin_evaluar">⬜ Sin evaluar</option>
           </select>
         </th>
-        <th></th>
-        <th></th>
-        <th></th>
+        <th></th><th></th><th></th>
         <th>
           <select id="f-cpa" onchange="renderTable()">
             <option value="">Todos</option>
@@ -202,7 +219,6 @@ async function loadAds() {
     const json = await res.json();
     allAds = json.ads || [];
 
-    // Build campaign filter options
     const campaigns = [...new Set(allAds.map(a => a.campaign).filter(Boolean))].sort();
     const sel = document.getElementById('f-campaign');
     sel.innerHTML = '<option value="">Todas</option>' +
@@ -230,7 +246,6 @@ function cpaLabel(cpa) {
   if (cpa <= 60000) return 'amarillo';
   return 'rojo';
 }
-
 function fmt(n, dec = 0) {
   if (n == null || n === '') return '—';
   return Number(n).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -239,16 +254,18 @@ function fmtARS(n) {
   if (n == null || n === '') return '—';
   return '$' + fmt(n, 0);
 }
-
 function sortBy(key) {
   if (sortKey === key) sortDir *= -1;
   else { sortKey = key; sortDir = -1; }
   renderTable();
 }
-
 function statusBadge(s) {
   if (!s) return '<span class="dim">—</span>';
   return '<span class="badge badge-' + s + '">' + (STATUS_LABELS[s] || s) + '</span>';
+}
+function thumbCell(url) {
+  if (url) return '<img class="ad-thumb" src="' + url + '" loading="lazy" onerror="this.parentNode.innerHTML=\'<div class=thumb-placeholder>🖼️</div>\'"/>';
+  return '<div class="thumb-placeholder">🖼️</div>';
 }
 
 function renderTable() {
@@ -259,11 +276,11 @@ function renderTable() {
   const fCpa        = document.getElementById('f-cpa').value;
 
   let rows = allAds.filter(ad => {
-    if (fName     && !(ad.name || '').toLowerCase().includes(fName)) return false;
-    if (fCampaign && ad.campaign !== fCampaign) return false;
-    if (fStatus   && ad.status !== fStatus) return false;
+    if (fName       && !(ad.name || '').toLowerCase().includes(fName)) return false;
+    if (fCampaign   && ad.campaign !== fCampaign) return false;
+    if (fStatus     && ad.status !== fStatus) return false;
     if (fPrevStatus && ad.prev_status !== fPrevStatus) return false;
-    if (fCpa      && cpaLabel(ad.cpa) !== fCpa) return false;
+    if (fCpa        && cpaLabel(ad.cpa) !== fCpa) return false;
     return true;
   });
 
@@ -284,11 +301,12 @@ function renderTable() {
 
   const tbody = document.getElementById('ads-body');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#888">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#888">Sin resultados</td></tr>';
   } else {
     tbody.innerHTML = rows.map(ad => {
       const cc = cpaColor(ad.cpa);
       return '<tr>' +
+        '<td>' + thumbCell(ad.thumbnail_url) + '</td>' +
         '<td title="' + (ad.ad_id || '') + '">' + (ad.name || '—') + '</td>' +
         '<td>' + (ad.campaign || '—') + '</td>' +
         '<td>' + statusBadge(ad.status) + '</td>' +
