@@ -12,10 +12,9 @@ export const handler = async (event) => {
     process.env.SUPABASE_SERVICE_KEY
   );
 
-  // Fetch ads with prev fields + campaign
   const [{ data: ads, error: e1 }, { data: snaps, error: e2 }] = await Promise.all([
     supabase.from("ads").select(
-      "ad_id, ad_name, campaign_name, funnel, status, prev_status, prev_funnel, prev_evaluated_at, updated_at"
+      "ad_id, ad_name, campaign_name, funnel, status, prev_status, prev_funnel, prev_evaluated_at, thumbnail_url, updated_at"
     ),
     supabase.from("ad_snapshots").select(
       "ad_id, spend, cpm, frequency, impressions, reach, results, cost_per_result"
@@ -23,14 +22,9 @@ export const handler = async (event) => {
   ]);
 
   if (e1 || e2) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: (e1 || e2).message }),
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: (e1 || e2).message }) };
   }
 
-  // Aggregate snapshots per ad
   const snapMap = {};
   for (const s of snaps || []) {
     if (!snapMap[s.ad_id]) {
@@ -48,7 +42,7 @@ export const handler = async (event) => {
   const result = (ads || []).map((ad) => {
     const m = snapMap[ad.ad_id] || { spend: 0, impressions: 0, reach: 0, results: 0, cpms: [], freqs: [] };
     const avgCPM = m.cpms.length ? m.cpms.reduce((a, b) => a + b, 0) / m.cpms.length : null;
-    const maxFreq = m.freqs.length ? Math.max(...m.freqs) : null;
+    const avgFreq = m.freqs.length ? m.freqs.reduce((a, b) => a + b, 0) / m.freqs.length : null;
     const cpa = m.results > 0 ? m.spend / m.results : null;
     return {
       ad_id: ad.ad_id,
@@ -59,12 +53,13 @@ export const handler = async (event) => {
       prev_status: ad.prev_status,
       prev_funnel: ad.prev_funnel,
       prev_evaluated_at: ad.prev_evaluated_at,
+      thumbnail_url: ad.thumbnail_url,
       spend: m.spend,
       impressions: m.impressions,
       reach: m.reach,
       results: m.results,
       cpm: avgCPM,
-      frequency: maxFreq,
+      frequency: avgFreq,
       cpa,
       updated_at: ad.updated_at,
     };
