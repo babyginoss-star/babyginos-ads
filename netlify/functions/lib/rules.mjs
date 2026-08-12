@@ -2,10 +2,10 @@
 // MOTOR DE REGLAS · Método 4Pi — Baby Ginos Ads Reader
 // ============================================================
 // Clasificación por comportamiento real del anuncio:
-//   El Tractor   → gasto alto + freq baja + CPM bajo + CPA bueno
-//   El Cerrador  → gasto alto + freq alta + CPM alto + CPA bueno
-//   El que no suma → gasto bajo + freq baja + CPM alto + sin datos
-//   Sin evaluar  → todo lo que no encaja en los 3 anteriores
+// El Tractor    → gasto alto + freq baja + CPM bajo + CPA bueno
+// El Cerrador   → gasto alto + freq alta + CPM alto + CPA bueno
+// El que no suma → gasto bajo + freq baja + CPM alto + sin datos
+// Sin evaluar   → todo lo que no encaja en los 3 anteriores
 
 export const CONFIG = {
   BASELINE_DAYS: 7,
@@ -17,8 +17,8 @@ export const CONFIG = {
   CPM_THRESHOLD: 10000,
 
   // Frecuencia (Método 4Pi)
-  FREQ_TOFU_MAX: 1.5,   // <= 1.5 = TOFU (freq baja)
-  FREQ_BOFU_MIN: 2.5,   // >= 2.5 = BOFU (freq alta)
+  FREQ_TOFU_MAX: 1.5,  // <= 1.5 = TOFU (freq baja)
+  FREQ_BOFU_MIN: 2.5,  // >= 2.5 = BOFU (freq alta)
 
   // CPA semáforo (pesos ARS)
   CPA_VERDE:    45000,  // <= 45k = verde (aceptable)
@@ -59,9 +59,9 @@ export function evaluateAd(ad, snapshots, ctx = {}) {
   // Gasto total acumulado del anuncio
   const totalSpend = snaps.reduce((a, r) => a + (Number(r.spend) || 0), 0);
 
-  // Frecuencia: máximo de los últimos 7 días
+  // Frecuencia: promedio de los últimos 7 días
   const freqSnaps = snaps.slice(-CONFIG.FREQ_WINDOW_DAYS);
-  const frecuencia = Math.max(...freqSnaps.map(r => Number(r.frequency) || 0), 0);
+  const frecuencia = avg(freqSnaps, "frequency") ?? 0;
 
   // Funnel
   const funnel = classifyFunnel(frecuencia);
@@ -77,14 +77,14 @@ export function evaluateAd(ad, snapshots, ctx = {}) {
   const avgCPR = avg(shortSnaps, "cost_per_result");
 
   // ── Las 4 señales ──────────────────────────────────────────
-  const campAvg = ctx.campaignSpendAvg?.[ad.campaign_name];
+  const campAvg   = ctx.campaignSpendAvg?.[ad.campaign_name];
   const gastoAlto = campAvg != null && campAvg > 0 && totalSpend > campAvg;
-  const gastoBajo  = !gastoAlto;
+  const gastoBajo = !gastoAlto;
 
   const freqBaja = frecuencia <= CONFIG.FREQ_TOFU_MAX;
   const freqAlta = frecuencia >= CONFIG.FREQ_BOFU_MIN;
 
-  const cpmBajo = avgCPM != null && avgCPM < CONFIG.CPM_THRESHOLD;
+  const cpmBajo = avgCPM != null && avgCPM <  CONFIG.CPM_THRESHOLD;
   const cpmAlto = avgCPM != null && avgCPM >= CONFIG.CPM_THRESHOLD;
 
   const costoBueno = avgCPR != null && avgCPR <= CONFIG.CPA_VERDE;
