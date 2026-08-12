@@ -33,23 +33,6 @@
     }
     .refresh-btn:hover { background: #005bbf; }
 
-    .filters {
-      display: flex;
-      gap: 12px;
-      padding: 14px 24px;
-      flex-wrap: wrap;
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-    }
-    .filters select, .filters input {
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 13px;
-      background: #fafafa;
-    }
-    .filters label { font-size: 12px; color: #555; display: flex; flex-direction: column; gap: 4px; }
-
     .summary-bar {
       display: flex;
       gap: 24px;
@@ -62,7 +45,9 @@
 
     .table-wrap { overflow-x: auto; padding: 0 24px 32px; }
     table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-top: 16px; }
-    th {
+
+    /* Header row: sort labels */
+    thead tr.header-labels th {
       background: #f0f0f5;
       text-align: left;
       padding: 10px 12px;
@@ -73,8 +58,27 @@
       white-space: nowrap;
       user-select: none;
     }
-    th:hover { background: #e5e5ea; }
+    thead tr.header-labels th:hover { background: #e5e5ea; }
     th .sort-icon { margin-left: 4px; opacity: .5; }
+
+    /* Filter row */
+    thead tr.header-filters th {
+      background: #fafafa;
+      padding: 6px 8px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    thead tr.header-filters input,
+    thead tr.header-filters select {
+      width: 100%;
+      padding: 4px 6px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fff;
+      color: #333;
+    }
+    thead tr.header-filters input::placeholder { color: #bbb; }
+
     td {
       padding: 9px 12px;
       font-size: 13px;
@@ -97,13 +101,13 @@
     .badge-sin_evaluar { background: #f0f0f0; color: #777; }
 
     /* CPA semáforo */
-    .cpa-verde   { color: #1a6e2e; font-weight: 600; }
+    .cpa-verde    { color: #1a6e2e; font-weight: 600; }
     .cpa-amarillo { color: #8a5700; font-weight: 600; }
-    .cpa-rojo    { color: #c0392b; font-weight: 600; }
+    .cpa-rojo     { color: #c0392b; font-weight: 600; }
 
     .loading { text-align: center; padding: 60px; color: #888; }
-    .error { text-align: center; padding: 60px; color: #c0392b; }
-    .dim { color: #aaa; }
+    .error   { text-align: center; padding: 60px; color: #c0392b; }
+    .dim     { color: #aaa; }
   </style>
 </head>
 <body>
@@ -116,41 +120,14 @@
   <button class="refresh-btn" onclick="loadAds()">↻ Actualizar</button>
 </header>
 
-<div class="filters">
-  <label>Estado
-    <select id="filter-status" onchange="renderTable()">
-      <option value="">Todos</option>
-      <option value="tractor">🚜 Tractor</option>
-      <option value="cerrador">🔒 Cerrador</option>
-      <option value="no_suma">❌ No suma</option>
-      <option value="sin_evaluar">⬜ Sin evaluar</option>
-    </select>
-  </label>
-  <label>CPA
-    <select id="filter-cpa" onchange="renderTable()">
-      <option value="">Todos</option>
-      <option value="verde">Verde (≤$45k)</option>
-      <option value="amarillo">Amarillo ($45-60k)</option>
-      <option value="rojo">Rojo (&gt;$60k)</option>
-    </select>
-  </label>
-  <label>Campaña
-    <select id="filter-campaign" onchange="renderTable()">
-      <option value="">Todas</option>
-    </select>
-  </label>
-  <label>Buscar nombre
-    <input type="text" id="filter-name" placeholder="nombre del ad…" oninput="renderTable()" />
-  </label>
-</div>
-
 <div class="summary-bar" id="summary-bar"></div>
 
 <div class="table-wrap">
   <div class="loading" id="loading">Cargando ads…</div>
   <table id="ads-table" style="display:none">
     <thead>
-      <tr>
+      <!-- Fila 1: labels + sort -->
+      <tr class="header-labels">
         <th onclick="sortBy('name')">Nombre <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('campaign')">Campaña <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('status')">Estado actual <span class="sort-icon">↕</span></th>
@@ -160,6 +137,41 @@
         <th onclick="sortBy('frequency')">Frecuencia <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('cpa')">CPA <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('results')">Compras <span class="sort-icon">↕</span></th>
+      </tr>
+      <!-- Fila 2: filtros inline -->
+      <tr class="header-filters">
+        <th><input type="text" id="f-name" placeholder="buscar…" oninput="renderTable()" /></th>
+        <th><select id="f-campaign" onchange="renderTable()"><option value="">Todas</option></select></th>
+        <th>
+          <select id="f-status" onchange="renderTable()">
+            <option value="">Todos</option>
+            <option value="tractor">🚜 Tractor</option>
+            <option value="cerrador">🔒 Cerrador</option>
+            <option value="no_suma">❌ No suma</option>
+            <option value="sin_evaluar">⬜ Sin evaluar</option>
+          </select>
+        </th>
+        <th>
+          <select id="f-prev-status" onchange="renderTable()">
+            <option value="">Todos</option>
+            <option value="tractor">🚜 Tractor</option>
+            <option value="cerrador">🔒 Cerrador</option>
+            <option value="no_suma">❌ No suma</option>
+            <option value="sin_evaluar">⬜ Sin evaluar</option>
+          </select>
+        </th>
+        <th></th>
+        <th></th>
+        <th></th>
+        <th>
+          <select id="f-cpa" onchange="renderTable()">
+            <option value="">Todos</option>
+            <option value="verde">Verde ≤$45k</option>
+            <option value="amarillo">Amarillo $45-60k</option>
+            <option value="rojo">Rojo &gt;$60k</option>
+          </select>
+        </th>
+        <th></th>
       </tr>
     </thead>
     <tbody id="ads-body"></tbody>
@@ -190,9 +202,9 @@ async function loadAds() {
     const json = await res.json();
     allAds = json.ads || [];
 
-    // Build campaign filter
+    // Build campaign filter options
     const campaigns = [...new Set(allAds.map(a => a.campaign).filter(Boolean))].sort();
-    const sel = document.getElementById('filter-campaign');
+    const sel = document.getElementById('f-campaign');
     sel.innerHTML = '<option value="">Todas</option>' +
       campaigns.map(c => '<option value="' + c + '">' + c + '</option>').join('');
 
@@ -236,22 +248,22 @@ function sortBy(key) {
 
 function statusBadge(s) {
   if (!s) return '<span class="dim">—</span>';
-  const cls = 'badge badge-' + s;
-  const label = STATUS_LABELS[s] || s;
-  return '<span class="' + cls + '">' + label + '</span>';
+  return '<span class="badge badge-' + s + '">' + (STATUS_LABELS[s] || s) + '</span>';
 }
 
 function renderTable() {
-  const filterStatus   = document.getElementById('filter-status').value;
-  const filterCpa      = document.getElementById('filter-cpa').value;
-  const filterCampaign = document.getElementById('filter-campaign').value;
-  const filterName     = document.getElementById('filter-name').value.toLowerCase();
+  const fName       = document.getElementById('f-name').value.toLowerCase();
+  const fCampaign   = document.getElementById('f-campaign').value;
+  const fStatus     = document.getElementById('f-status').value;
+  const fPrevStatus = document.getElementById('f-prev-status').value;
+  const fCpa        = document.getElementById('f-cpa').value;
 
   let rows = allAds.filter(ad => {
-    if (filterStatus && ad.status !== filterStatus) return false;
-    if (filterCpa && cpaLabel(ad.cpa) !== filterCpa) return false;
-    if (filterCampaign && ad.campaign !== filterCampaign) return false;
-    if (filterName && !(ad.name || '').toLowerCase().includes(filterName)) return false;
+    if (fName     && !(ad.name || '').toLowerCase().includes(fName)) return false;
+    if (fCampaign && ad.campaign !== fCampaign) return false;
+    if (fStatus   && ad.status !== fStatus) return false;
+    if (fPrevStatus && ad.prev_status !== fPrevStatus) return false;
+    if (fCpa      && cpaLabel(ad.cpa) !== fCpa) return false;
     return true;
   });
 
