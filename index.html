@@ -83,92 +83,83 @@
     }
     tr:hover td { background: #fafafa; }
 
+    /* Estado badges */
     .badge {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 3px 9px;
       border-radius: 12px;
       font-size: 11px;
       font-weight: 600;
     }
-    .badge-TOFU  { background: #ddf4ff; color: #0071e3; }
-    .badge-MOFU  { background: #fff3cd; color: #8a5700; }
-    .badge-BOFU  { background: #d4edda; color: #1a6e2e; }
-    .badge-SIN_DATOS { background: #f0f0f0; color: #888; }
+    .badge-tractor     { background: #d4edda; color: #1a6e2e; }
+    .badge-cerrador    { background: #d0e4ff; color: #0040a0; }
+    .badge-no_suma     { background: #fde8e8; color: #b91c1c; }
+    .badge-sin_evaluar { background: #f0f0f0; color: #777; }
 
+    /* CPA semáforo */
     .cpa-verde   { color: #1a6e2e; font-weight: 600; }
     .cpa-amarillo { color: #8a5700; font-weight: 600; }
     .cpa-rojo    { color: #c0392b; font-weight: 600; }
 
-    .status-ACTIVE   { color: #1a6e2e; }
-    .status-PAUSED   { color: #888; }
-    .status-other    { color: #c0392b; }
-
     .loading { text-align: center; padding: 60px; color: #888; }
     .error { text-align: center; padding: 60px; color: #c0392b; }
-    .updated-at { font-size: 11px; color: #aaa; }
+    .dim { color: #aaa; }
   </style>
 </head>
 <body>
 
 <header>
   <div>
-    <h1>Baby Ginos — Ads Reader</h1>
-    <span id="last-updated">Cargando...</span>
+    <h1>👶 Baby Ginos — Ads Reader</h1>
+    <span id="last-updated">Cargando…</span>
   </div>
-  <button class="refresh-btn" onclick="loadAds()">Actualizar</button>
+  <button class="refresh-btn" onclick="loadAds()">↻ Actualizar</button>
 </header>
 
 <div class="filters">
-  <label>Funnel
-    <select id="filter-funnel" onchange="renderTable()">
-      <option value="">Todos</option>
-      <option value="TOFU">TOFU</option>
-      <option value="MOFU">MOFU</option>
-      <option value="BOFU">BOFU</option>
-      <option value="SIN_DATOS">Sin datos</option>
-    </select>
-  </label>
   <label>Estado
     <select id="filter-status" onchange="renderTable()">
       <option value="">Todos</option>
-      <option value="ACTIVE">Activo</option>
-      <option value="PAUSED">Pausado</option>
+      <option value="tractor">🚜 Tractor</option>
+      <option value="cerrador">🔒 Cerrador</option>
+      <option value="no_suma">❌ No suma</option>
+      <option value="sin_evaluar">⬜ Sin evaluar</option>
     </select>
   </label>
   <label>CPA
     <select id="filter-cpa" onchange="renderTable()">
       <option value="">Todos</option>
-      <option value="verde">Verde (&lt;=45k)</option>
-      <option value="amarillo">Amarillo (45-55k)</option>
-      <option value="rojo">Rojo (&gt;55k)</option>
+      <option value="verde">Verde (≤$45k)</option>
+      <option value="amarillo">Amarillo ($45-60k)</option>
+      <option value="rojo">Rojo (&gt;$60k)</option>
+    </select>
+  </label>
+  <label>Campaña
+    <select id="filter-campaign" onchange="renderTable()">
+      <option value="">Todas</option>
     </select>
   </label>
   <label>Buscar nombre
-    <input type="text" id="filter-name" placeholder="nombre del ad..." oninput="renderTable()" />
+    <input type="text" id="filter-name" placeholder="nombre del ad…" oninput="renderTable()" />
   </label>
 </div>
 
 <div class="summary-bar" id="summary-bar"></div>
 
 <div class="table-wrap">
-  <div class="loading" id="loading">Cargando ads...</div>
+  <div class="loading" id="loading">Cargando ads…</div>
   <table id="ads-table" style="display:none">
     <thead>
       <tr>
-        <th onclick="sortBy('name')">Nombre</th>
-        <th onclick="sortBy('status')">Estado</th>
-        <th onclick="sortBy('funnel')">Funnel</th>
-        <th onclick="sortBy('spend')">Gasto $ARS</th>
-        <th onclick="sortBy('impressions')">Impresiones</th>
-        <th onclick="sortBy('reach')">Alcance</th>
-        <th onclick="sortBy('frequency')">Frecuencia</th>
-        <th onclick="sortBy('cpm')">CPM</th>
-        <th onclick="sortBy('ctr')">CTR%</th>
-        <th onclick="sortBy('cpc')">CPC</th>
-        <th onclick="sortBy('purchases')">Compras</th>
-        <th onclick="sortBy('cpa')">CPA</th>
-        <th onclick="sortBy('roas')">ROAS</th>
-        <th onclick="sortBy('updated_at')">Ultima sync</th>
+        <th onclick="sortBy('name')">Nombre <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('campaign')">Campaña <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('status')">Estado actual <span class="sort-icon">↕</span></th>
+        <th>Estado hace 7 días</th>
+        <th onclick="sortBy('spend')">Gasto $ARS <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('cpm')">CPM <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('frequency')">Frecuencia <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('cpa')">CPA <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('results')">Compras <span class="sort-icon">↕</span></th>
       </tr>
     </thead>
     <tbody id="ads-body"></tbody>
@@ -182,49 +173,59 @@ let sortDir = -1;
 
 const API = '/.netlify/functions/get-ads';
 
+const STATUS_LABELS = {
+  tractor:     '🚜 Tractor',
+  cerrador:    '🔒 Cerrador',
+  no_suma:     '❌ No suma',
+  sin_evaluar: '⬜ Sin evaluar',
+};
+
 async function loadAds() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('ads-table').style.display = 'none';
-  document.getElementById('last-updated').textContent = 'Actualizando...';
+  document.getElementById('last-updated').textContent = 'Actualizando…';
   try {
     const res = await fetch(API);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
     allAds = json.ads || [];
+
+    // Build campaign filter
+    const campaigns = [...new Set(allAds.map(a => a.campaign).filter(Boolean))].sort();
+    const sel = document.getElementById('filter-campaign');
+    sel.innerHTML = '<option value="">Todas</option>' +
+      campaigns.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+
     document.getElementById('last-updated').textContent =
       'Actualizado: ' + new Date().toLocaleString('es-AR');
     renderTable();
   } catch (e) {
-    document.getElementById('loading').textContent = 'Error cargando datos: ' + e.message;
-    document.getElementById('loading').className = 'error';
+    const el = document.getElementById('loading');
+    el.textContent = '⚠️ Error: ' + e.message;
+    el.className = 'error';
   }
 }
 
-function cpaClass(cpa) {
+function cpaColor(cpa) {
   if (!cpa || cpa <= 0) return '';
   if (cpa <= 45000) return 'cpa-verde';
-  if (cpa <= 55000) return 'cpa-amarillo';
+  if (cpa <= 60000) return 'cpa-amarillo';
   return 'cpa-rojo';
 }
 function cpaLabel(cpa) {
   if (!cpa || cpa <= 0) return '';
   if (cpa <= 45000) return 'verde';
-  if (cpa <= 55000) return 'amarillo';
+  if (cpa <= 60000) return 'amarillo';
   return 'rojo';
 }
 
-function fmt(n, dec) {
-  dec = dec || 0;
-  if (n == null || n === '') return '-';
+function fmt(n, dec = 0) {
+  if (n == null || n === '') return '—';
   return Number(n).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 function fmtARS(n) {
-  if (n == null || n === '') return '-';
+  if (n == null || n === '') return '—';
   return '$' + fmt(n, 0);
-}
-function fmtPct(n) {
-  if (n == null || n === '') return '-';
-  return fmt(n, 2) + '%';
 }
 
 function sortBy(key) {
@@ -233,60 +234,58 @@ function sortBy(key) {
   renderTable();
 }
 
-function renderTable() {
-  const funnel = document.getElementById('filter-funnel').value;
-  const status = document.getElementById('filter-status').value;
-  const cpaFilter = document.getElementById('filter-cpa').value;
-  const name = document.getElementById('filter-name').value.toLowerCase();
+function statusBadge(s) {
+  if (!s) return '<span class="dim">—</span>';
+  const cls = 'badge badge-' + s;
+  const label = STATUS_LABELS[s] || s;
+  return '<span class="' + cls + '">' + label + '</span>';
+}
 
-  let rows = allAds.filter(function(ad) {
-    if (funnel && ad.funnel !== funnel) return false;
-    if (status && ad.status !== status) return false;
-    if (cpaFilter && cpaLabel(ad.cpa) !== cpaFilter) return false;
-    if (name && !(ad.name || '').toLowerCase().includes(name)) return false;
+function renderTable() {
+  const filterStatus   = document.getElementById('filter-status').value;
+  const filterCpa      = document.getElementById('filter-cpa').value;
+  const filterCampaign = document.getElementById('filter-campaign').value;
+  const filterName     = document.getElementById('filter-name').value.toLowerCase();
+
+  let rows = allAds.filter(ad => {
+    if (filterStatus && ad.status !== filterStatus) return false;
+    if (filterCpa && cpaLabel(ad.cpa) !== filterCpa) return false;
+    if (filterCampaign && ad.campaign !== filterCampaign) return false;
+    if (filterName && !(ad.name || '').toLowerCase().includes(filterName)) return false;
     return true;
   });
 
-  rows.sort(function(a, b) {
-    const av = a[sortKey] != null ? a[sortKey] : '';
-    const bv = b[sortKey] != null ? b[sortKey] : '';
+  rows.sort((a, b) => {
+    const av = a[sortKey] ?? '';
+    const bv = b[sortKey] ?? '';
     if (av < bv) return -sortDir;
     if (av > bv) return sortDir;
     return 0;
   });
 
-  const totalSpend = rows.reduce(function(s, a) { return s + (a.spend || 0); }, 0);
-  const totalPurchases = rows.reduce(function(s, a) { return s + (a.purchases || 0); }, 0);
-  const avgFreq = rows.length ? (rows.reduce(function(s, a) { return s + (a.frequency || 0); }, 0) / rows.length) : 0;
+  const totalSpend = rows.reduce((s, a) => s + (a.spend || 0), 0);
+  const totalBuys  = rows.reduce((s, a) => s + (a.results || 0), 0);
   document.getElementById('summary-bar').innerHTML =
     '<span>Ads: <strong>' + rows.length + '</strong></span>' +
     '<span>Gasto total: <strong>' + fmtARS(totalSpend) + '</strong></span>' +
-    '<span>Compras: <strong>' + totalPurchases + '</strong></span>' +
-    '<span>Freq promedio: <strong>' + fmt(avgFreq, 2) + '</strong></span>';
+    '<span>Compras totales: <strong>' + totalBuys + '</strong></span>';
 
   const tbody = document.getElementById('ads-body');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:#888">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#888">Sin resultados</td></tr>';
   } else {
-    tbody.innerHTML = rows.map(function(ad) {
-      const cc = cpaClass(ad.cpa);
-      const sc = ad.status === 'ACTIVE' ? 'status-ACTIVE' : ad.status === 'PAUSED' ? 'status-PAUSED' : 'status-other';
-      const updatedAt = ad.updated_at ? new Date(ad.updated_at).toLocaleString('es-AR') : '-';
+    tbody.innerHTML = rows.map(ad => {
+      const cc = cpaColor(ad.cpa);
       return '<tr>' +
-        '<td title="' + (ad.id || '') + '">' + (ad.name || '-') + '</td>' +
-        '<td class="' + sc + '">' + (ad.status || '-') + '</td>' +
-        '<td><span class="badge badge-' + (ad.funnel || 'SIN_DATOS') + '">' + (ad.funnel || 'SIN_DATOS') + '</span></td>' +
+        '<td title="' + (ad.ad_id || '') + '">' + (ad.name || '—') + '</td>' +
+        '<td>' + (ad.campaign || '—') + '</td>' +
+        '<td>' + statusBadge(ad.status) + '</td>' +
+        '<td>' + statusBadge(ad.prev_status) + '</td>' +
         '<td>' + fmtARS(ad.spend) + '</td>' +
-        '<td>' + fmt(ad.impressions) + '</td>' +
-        '<td>' + fmt(ad.reach) + '</td>' +
-        '<td>' + fmt(ad.frequency, 2) + '</td>' +
         '<td>' + fmtARS(ad.cpm) + '</td>' +
-        '<td>' + fmtPct(ad.ctr) + '</td>' +
-        '<td>' + fmtARS(ad.cpc) + '</td>' +
-        '<td>' + (ad.purchases != null ? ad.purchases : '-') + '</td>' +
+        '<td>' + fmt(ad.frequency, 2) + '</td>' +
         '<td class="' + cc + '">' + fmtARS(ad.cpa) + '</td>' +
-        '<td>' + (ad.roas != null ? fmt(ad.roas, 2) + 'x' : '-') + '</td>' +
-        '<td class="updated-at">' + updatedAt + '</td>' +
+        '<td>' + (ad.results ?? '—') + '</td>' +
         '</tr>';
     }).join('');
   }
