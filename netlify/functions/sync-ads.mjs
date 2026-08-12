@@ -84,11 +84,33 @@ export default async function handler() {
     const ids = batch.join(",");
     try {
       const res = await fetch(
-        `https://graph.facebook.com/v19.0/?ids=${ids}&fields=creative{thumbnail_url}&access_token=${META_ACCESS_TOKEN}`
+        `https://graph.facebook.com/v19.0/?ids=${ids}&fields=creative{thumbnail_url,image_url,video_id}&access_token=${META_ACCESS_TOKEN}`
       );
       const data = await res.json();
+
+      // Paso 1: thumbnail_url o image_url directos; guardar video_ids pendientes
+      const pendingVideos = []; // [{ adId, videoId }]
       for (const [adId, adData] of Object.entries(data)) {
-        thumbnailMap[adId] = adData?.creative?.thumbnail_url || null;
+        const c = adData?.creative;
+        const url = c?.thumbnail_url || c?.image_url || null;
+        if (url) {
+          thumbnailMap[adId] = url;
+        } else if (c?.video_id) {
+          pendingVideos.push({ adId, videoId: c.video_id });
+        }
+      }
+
+      // Paso 2: para ads de video sin thumbnail, pedir /{video_id}?fields=picture
+      for (const { adId, videoId } of pendingVideos) {
+        try {
+          const vRes = await fetch(
+            `https://graph.facebook.com/v19.0/${videoId}?fields=picture&access_token=${META_ACCESS_TOKEN}`
+          );
+          const vData = await vRes.json();
+          if (vData.picture) thumbnailMap[adId] = vData.picture;
+        } catch (ve) {
+          console.error(`Error fetching video picture ${videoId}:`, ve.message);
+        }
       }
     } catch (e) {
       console.error("Error fetching thumbnails batch:", e.message);
