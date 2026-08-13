@@ -5,11 +5,11 @@
 //
 // 1. Tractor    : clasificable + freq baja + CPM bajo + CPA <= 45k
 // 2. Prometedor : clasificable + freq baja + CPM bajo + CPA 45k-55k
-// 3. Atencion   : gastoAlto + CPA > 70k  (1 compra alcanza)
-//                 clasificable + CPA > 55k (sin techo)
-// 4. Cerrador   : clasificable + freq alta + CPM alto + CPA <= 45k
-// 5. No suma    : gastoBajo + freq baja + CPM alto + sin datos
-// 6. Sin evaluar: todo lo demas
+// 3. Pausar     : gastoAlto + CPA > 70k  (1 compra alcanza, pausar ya)
+// 4. Atencion   : clasificable + CPA > 55k (decidir si pausar)
+// 5. Cerrador   : clasificable + freq alta + CPM alto + CPA <= 45k
+// 6. No suma    : gastoBajo + freq baja + CPM alto + sin datos
+// 7. Sin evaluar: todo lo demas
 
 export const CONFIG = {
   BASELINE_DAYS: 7,
@@ -86,28 +86,28 @@ export function evaluateAd(ad, snapshots, ctx = {}) {
 
   // 1. Tractor
   if (clasificable && freqBaja && cpmBajo && costoBueno)
-    return { funnel, status: "tractor", mensaje: "El Tractor - Meta lo favorece, llega a gente nueva y convierte. Escala." };
+    return { funnel, status: "tractor", mensaje: "El Tractor - llega a gente nueva y convierte. Escala." };
 
   // 2. Prometedor
   if (clasificable && freqBaja && cpmBajo && costoPrometedor)
-    return { funnel, status: "prometedor", mensaje: "Prometedor - casi un Tractor, CPA en amarillo. Optimiza y puede escalar." };
+    return { funnel, status: "prometedor", mensaje: "Prometedor - CPA en amarillo. Optimiza y puede escalar." };
 
-  // 3a. Atencion rojo: gasto alto + CPA > 70k (aunque tenga 1 sola compra)
+  // 3. Pausar: gasto alto + CPA > 70k (aunque tenga 1 sola compra)
   if (gastoAlto && cpaRojo)
-    return { funnel, status: "atencion", mensaje: "Atencion - CPA rojo con gasto alto. Pausar." };
+    return { funnel, status: "pausar", mensaje: "Pausar - CPA rojo con gasto alto. Pausalo ahora." };
 
-  // 3b. Atencion: clasificable + CPA > 55k
+  // 4. Atencion: clasificable + CPA > 55k
   if (clasificable && costoAtencion)
-    return { funnel, status: "atencion", mensaje: "Atencion - gastas plata pero el CPA esta caro. Decide si pausas o seguis mirando." };
+    return { funnel, status: "atencion", mensaje: "Atencion - CPA caro. Decide si pausas o seguis mirando." };
 
-  // 4. Cerrador
+  // 5. Cerrador
   if (clasificable && freqAlta && cpmAlto && costoBueno)
     return { funnel, status: "cerrador", mensaje: "El Cerrador - cierra bien en audiencia caliente. No escala en frio." };
 
-  // 5. No suma
+  // 6. No suma
   if (gastoBajo && freqBaja && cpmAlto && sinDatos)
-    return { funnel, status: "no_suma", mensaje: "El que no suma - Meta no lo favorece, caro y sin conversiones. Revisar o pausar." };
+    return { funnel, status: "no_suma", mensaje: "No suma - Meta no lo favorece, caro y sin conversiones. Revisar o pausar." };
 
-  // 6. Sin evaluar
-  return { funnel, status: "sin_evaluar", mensaje: "Sin evaluar - no encaja en ningun patron definido aun." };
+  // 7. Sin evaluar
+  return { funnel, status: "sin_evaluar", mensaje: "Sin evaluar - no encaja en ningun patron." };
 }
