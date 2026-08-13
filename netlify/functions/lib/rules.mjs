@@ -2,13 +2,13 @@
 // MOTOR DE REGLAS · Método 4Pi — Baby Ginos Ads Reader
 // ============================================================
 // Clasificación por comportamiento real del anuncio:
-// El Tractor    → gasto alto + freq baja + CPM bajo + CPA bueno
-// El Cerrador   → gasto alto + freq alta + CPM alto + CPA bueno
+// El Tractor    → clasificable + freq baja + CPM bajo + CPA <= 45k
+// El Cerrador   → clasificable + freq alta + CPM alto + CPA <= 45k
 // El que no suma → gasto bajo + freq baja + CPM alto + sin datos
 // Sin evaluar   → todo lo que no encaja en los 3 anteriores
 //
-// gastoAlto OR tieneComprasSuficientes (>= 2 compras en últimos 3 días)
-// permite clasificar anuncios con gasto bajo pero conversiones reales
+// "clasificable" = gastoAlto OR tieneComprasSuficientes (>= 2 compras últimos 3 días)
+// Atención no tiene techo de CPA: cualquier CPA > $55k con clasificable → pausar
 
 export const CONFIG = {
   BASELINE_DAYS: 7,
@@ -26,8 +26,8 @@ export const CONFIG = {
   // CPA semáforo (pesos ARS)
   CPA_VERDE:       45000,  // <= 45k = verde (aceptable)
   CPA_PROMETEDOR:  55000,  // 45k-55k = prometedor (casi tractor)
-  CPA_ATENCION:    70000,  // 56k-70k = atención (gastás plata, retorno malo)
-                           // > 70k = rojo (no aceptable)
+  CPA_ATENCION:    70000,  // semáforo naranja: 56k-70k / rojo: >70k
+                           // cualquier CPA > CPA_PROMETEDOR con clasificable → Atención (sin techo)
 
   // Mínimo de compras promedio en ventana corta para clasificar con gasto bajo
   MIN_RESULTS_TO_CLASSIFY: 2,
@@ -85,7 +85,7 @@ export function evaluateAd(ad, snapshots, ctx = {}) {
   const avgCPR     = avg(shortSnaps, "cost_per_result");
   const avgResults = avg(shortSnaps, "results");
 
-  // ── Las 4 señales ──────────────────────────────────────────
+  // ── Las señales ────────────────────────────────────────────
   const campAvg   = ctx.campaignSpendAvg?.[ad.campaign_name];
   const gastoAlto = campAvg != null && campAvg > 0 && totalSpend >= campAvg;
 
@@ -103,12 +103,11 @@ export function evaluateAd(ad, snapshots, ctx = {}) {
   const cpmBajo = avgCPM != null && avgCPM <  CONFIG.CPM_THRESHOLD;
   const cpmAlto = avgCPM != null && avgCPM >= CONFIG.CPM_THRESHOLD;
 
-  const costoBueno = avgCPR != null && avgCPR <= CONFIG.CPA_VERDE;
-  const sinDatos   = avgCPR == null;
-  // ───────────────────────────────────────────────────────────
-
+  const costoBueno     = avgCPR != null && avgCPR <= CONFIG.CPA_VERDE;
+  const sinDatos       = avgCPR == null;
   const costoPrometedor = avgCPR != null && avgCPR > CONFIG.CPA_VERDE && avgCPR <= CONFIG.CPA_PROMETEDOR;
-  const costoAtencion   = avgCPR != null && avgCPR > CONFIG.CPA_PROMETEDOR && avgCPR <= CONFIG.CPA_ATENCION;
+  const costoAtencion   = avgCPR != null && avgCPR > CONFIG.CPA_PROMETEDOR; // sin techo: cualquier CPA > 55k
+  // ───────────────────────────────────────────────────────────
 
   // 1. El Tractor: clasificable + freq baja + CPM bajo + CPA <= 45k
   if (clasificable && freqBaja && cpmBajo && costoBueno) {
@@ -116,16 +115,16 @@ export function evaluateAd(ad, snapshots, ctx = {}) {
       mensaje: "El Tractor — Meta lo favorece, llega a gente nueva y convierte. Escalá." };
   }
 
-  // 2. Prometedor: clasificable + freq baja + CPM bajo + CPA $45k-$55k
+  // 2. Prometedor: clasificable + freq baja + CPM bajo + CPA 45k-55k
   if (clasificable && freqBaja && cpmBajo && costoPrometedor) {
     return { funnel, status: "prometedor",
       mensaje: "Prometedor — casi un Tractor, CPA en amarillo. Optimizá y puede escalar." };
   }
 
-  // 3. Atención: clasificable + CPA $56k-$70k
+  // 3. Atención: clasificable + CPA > 55k (sin techo — cualquier CPA caro con gasto)
   if (clasificable && costoAtencion) {
     return { funnel, status: "atencion",
-      mensaje: "Atención — CPA caro. Decidí si pausás o seguís mirando." };
+      mensaje: "Atención — gastás plata pero el CPA está caro. Decidí si pausás o seguís mirando." };
   }
 
   // 4. El Cerrador: clasificable + freq alta + CPM alto + CPA <= 45k
