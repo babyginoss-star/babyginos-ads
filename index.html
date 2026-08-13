@@ -134,29 +134,29 @@
 
 <header>
   <div>
-    <h1>Baby Ginos — Ads Reader</h1>
+    <h1>👶 Baby Ginos — Ads Reader</h1>
     <span id="last-updated">Cargando</span>
   </div>
-  <button class="refresh-btn" onclick="loadAds()">Actualizar</button>
+  <button class="refresh-btn" onclick="loadAds()">↻ Actualizar</button>
 </header>
 
 <div class="summary-bar" id="summary-bar"></div>
 
 <div class="table-wrap">
-  <div class="loading" id="loading">Cargando ads</div>
+  <div class="loading" id="loading">Cargando ads…</div>
   <table id="ads-table" style="display:none">
     <thead>
       <tr class="header-labels">
         <th class="no-sort">Creativo</th>
-        <th onclick="sortBy('name')">Nombre</th>
-        <th onclick="sortBy('campaign')">Campana</th>
-        <th onclick="sortBy('status')">Estado actual</th>
+        <th onclick="sortBy('name')">Nombre <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('campaign')">Campaña <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('status')">Estado actual <span class="sort-icon">↕</span></th>
         <th>Estado hace 7 dias</th>
-        <th onclick="sortBy('spend')">Gasto ARS</th>
-        <th onclick="sortBy('cpm')">CPM</th>
-        <th onclick="sortBy('frequency')">Frecuencia</th>
-        <th onclick="sortBy('cpa')">CPA</th>
-        <th onclick="sortBy('results')">Compras</th>
+        <th onclick="sortBy('spend')">Gasto $ARS <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('cpm')">CPM <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('frequency')">Frecuencia <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('cpa')">CPA <span class="sort-icon">↕</span></th>
+        <th onclick="sortBy('results')">Compras <span class="sort-icon">↕</span></th>
       </tr>
       <tr class="header-filters">
         <th></th>
@@ -165,33 +165,33 @@
         <th>
           <select id="f-status" onchange="renderTable()">
             <option value="">Todos</option>
-            <option value="tractor">Tractor</option>
-            <option value="prometedor">Prometedor</option>
-            <option value="atencion">Atencion</option>
-            <option value="cerrador">Cerrador</option>
-            <option value="no_suma">No suma</option>
-            <option value="sin_evaluar">Sin evaluar</option>
+            <option value="tractor">🚜 Tractor</option>
+            <option value="prometedor">⭐ Prometedor</option>
+            <option value="atencion">⚠️ Atención</option>
+            <option value="cerrador">🔒 Cerrador</option>
+            <option value="no_suma">❌ No suma</option>
+            <option value="sin_evaluar">⬜ Sin evaluar</option>
           </select>
         </th>
         <th>
           <select id="f-prev-status" onchange="renderTable()">
             <option value="">Todos</option>
-            <option value="tractor">Tractor</option>
-            <option value="prometedor">Prometedor</option>
-            <option value="atencion">Atencion</option>
-            <option value="cerrador">Cerrador</option>
-            <option value="no_suma">No suma</option>
-            <option value="sin_evaluar">Sin evaluar</option>
+            <option value="tractor">🚜 Tractor</option>
+            <option value="prometedor">⭐ Prometedor</option>
+            <option value="atencion">⚠️ Atención</option>
+            <option value="cerrador">🔒 Cerrador</option>
+            <option value="no_suma">❌ No suma</option>
+            <option value="sin_evaluar">⬜ Sin evaluar</option>
           </select>
         </th>
         <th></th><th></th><th></th>
         <th>
           <select id="f-cpa" onchange="renderTable()">
             <option value="">Todos</option>
-            <option value="verde">Verde hasta 45k</option>
-            <option value="amarillo">Amarillo 45-55k</option>
-            <option value="naranja">Naranja 56-70k</option>
-            <option value="rojo">Rojo mas de 70k</option>
+            <option value="verde">Verde ≤$45k</option>
+            <option value="amarillo">Amarillo $45-55k</option>
+            <option value="naranja">Naranja $56-70k</option>
+            <option value="rojo">Rojo &gt;$70k</option>
           </select>
         </th>
         <th></th>
@@ -209,12 +209,12 @@ let sortDir = -1;
 const API = '/.netlify/functions/get-ads';
 
 const STATUS_LABELS = {
-  tractor:     'Tractor',
-  prometedor:  'Prometedor',
-  atencion:    'Atencion',
-  cerrador:    'Cerrador',
-  no_suma:     'No suma',
-  sin_evaluar: 'Sin evaluar',
+  tractor:     '🚜 Tractor',
+  prometedor:  '⭐ Prometedor',
+  atencion:    '⚠️ Atención',
+  cerrador:    '🔒 Cerrador',
+  no_suma:     '❌ No suma',
+  sin_evaluar: '⬜ Sin evaluar',
 };
 
 async function loadAds() {
@@ -254,8 +254,7 @@ function cpaLabel(cpa) {
   if (cpa <= 70000) return 'naranja';
   return 'rojo';
 }
-function fmt(n, dec) {
-  dec = dec || 0;
+function fmt(n, dec = 0) {
   if (n == null || n === '') return '-';
   return Number(n).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
@@ -273,8 +272,8 @@ function statusBadge(s) {
   return '<span class="badge badge-' + s + '">' + (STATUS_LABELS[s] || s) + '</span>';
 }
 function thumbCell(url) {
-  if (url) return '<img class="ad-thumb" src="' + url + '" loading="lazy" onerror="this.parentNode.innerHTML=this.parentNode.innerHTML"/>';
-  return '<div class="thumb-placeholder">?</div>';
+  if (url) return '<img class="ad-thumb" src="' + url + '" loading="lazy" onerror="this.style.display=\'none\'"/>';
+  return '<div class="thumb-placeholder">🖼️</div>';
 }
 
 function renderTable() {
