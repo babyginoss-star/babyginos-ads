@@ -116,12 +116,15 @@
       font-weight: 600;
     }
     .badge-tractor     { background: #d4edda; color: #1a6e2e; }
+    .badge-prometedor  { background: #fff3cd; color: #7a4f00; }
+    .badge-atencion    { background: #ffe0b2; color: #8d3200; }
     .badge-cerrador    { background: #d0e4ff; color: #0040a0; }
     .badge-no_suma     { background: #fde8e8; color: #b91c1c; }
     .badge-sin_evaluar { background: #f0f0f0; color: #777; }
 
     .cpa-verde    { color: #1a6e2e; font-weight: 600; }
     .cpa-amarillo { color: #8a5700; font-weight: 600; }
+    .cpa-naranja  { color: #8d3200; font-weight: 600; }
     .cpa-rojo     { color: #c0392b; font-weight: 600; }
 
     .loading { text-align: center; padding: 60px; color: #888; }
@@ -165,6 +168,8 @@
           <select id="f-status" onchange="renderTable()">
             <option value="">Todos</option>
             <option value="tractor">🚜 Tractor</option>
+            <option value="prometedor">⭐ Prometedor</option>
+            <option value="atencion">⚠️ Atención</option>
             <option value="cerrador">🔒 Cerrador</option>
             <option value="no_suma">❌ No suma</option>
             <option value="sin_evaluar">⬜ Sin evaluar</option>
@@ -174,6 +179,8 @@
           <select id="f-prev-status" onchange="renderTable()">
             <option value="">Todos</option>
             <option value="tractor">🚜 Tractor</option>
+            <option value="prometedor">⭐ Prometedor</option>
+            <option value="atencion">⚠️ Atención</option>
             <option value="cerrador">🔒 Cerrador</option>
             <option value="no_suma">❌ No suma</option>
             <option value="sin_evaluar">⬜ Sin evaluar</option>
@@ -184,8 +191,9 @@
           <select id="f-cpa" onchange="renderTable()">
             <option value="">Todos</option>
             <option value="verde">Verde ≤$45k</option>
-            <option value="amarillo">Amarillo $45-60k</option>
-            <option value="rojo">Rojo &gt;$60k</option>
+            <option value="amarillo">Amarillo $45-55k</option>
+            <option value="naranja">Naranja $56-70k</option>
+            <option value="rojo">Rojo >$70k</option>
           </select>
         </th>
         <th></th>
@@ -204,6 +212,8 @@ const API = '/.netlify/functions/get-ads';
 
 const STATUS_LABELS = {
   tractor:     '🚜 Tractor',
+  prometedor:  '⭐ Prometedor',
+  atencion:    '⚠️ Atención',
   cerrador:    '🔒 Cerrador',
   no_suma:     '❌ No suma',
   sin_evaluar: '⬜ Sin evaluar',
@@ -237,13 +247,15 @@ async function loadAds() {
 function cpaColor(cpa) {
   if (!cpa || cpa <= 0) return '';
   if (cpa <= 45000) return 'cpa-verde';
-  if (cpa <= 60000) return 'cpa-amarillo';
+  if (cpa <= 55000) return 'cpa-amarillo';
+  if (cpa <= 70000) return 'cpa-naranja';
   return 'cpa-rojo';
 }
 function cpaLabel(cpa) {
   if (!cpa || cpa <= 0) return '';
   if (cpa <= 45000) return 'verde';
-  if (cpa <= 60000) return 'amarillo';
+  if (cpa <= 55000) return 'amarillo';
+  if (cpa <= 70000) return 'naranja';
   return 'rojo';
 }
 function fmt(n, dec = 0) {
