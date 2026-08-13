@@ -83,34 +83,69 @@ export default async function handler() {
     const batch = adIds.slice(i, i + BATCH);
     const ids = batch.join(",");
     try {
-      const res = await fetch(
-        `https://graph.facebook.com/v19.0/?ids=${ids}&fields=creative{thumbnail_url,image_url,video_id}&access_token=${META_ACCESS_TOKEN}`
+      // Paso 1: obtener creative IDs de los ads
+      const r1 = await fetch(
+        `https://graph.facebook.com/v19.0/?ids=${ids}&fields=creative&access_token=${META_ACCESS_TOKEN}`
       );
-      const data = await res.json();
+      const d1 = await r1.json();
+      console.log("Creative IDs response sample:", JSON.stringify(Object.entries(d1).slice(0, 2)));
 
-      // Paso 1: thumbnail_url o image_url directos; guardar video_ids pendientes
-      const pendingVideos = []; // [{ adId, videoId }]
-      for (const [adId, adData] of Object.entries(data)) {
-        const c = adData?.creative;
-        const url = c?.thumbnail_url || c?.image_url || null;
-        if (url) {
-          thumbnailMap[adId] = url;
-        } else if (c?.video_id) {
-          pendingVideos.push({ adId, videoId: c.video_id });
+      // Mapeo adId → creativeId
+      const adToCreative = {};
+      const creativeIds = [];
+      for (const [adId, adData] of Object.entries(d1)) {
+        const cid = adData?.creative?.id;
+        if (cid) {
+          adToCreative[adId] = cid;
+          creativeIds.push(cid);
         }
       }
 
-      // Paso 2: para ads de video sin thumbnail, pedir /{video_id}?fields=picture
-      for (const { adId, videoId } of pendingVideos) {
+      if (!creativeIds.length) continue;
+
+      // Paso 2: buscar thumbnails de los creative objects directamente
+      const cIds = creativeIds.join(",");
+      const r2 = await fetch(
+        `https://graph.facebook.com/v19.0/?ids=${cIds}&fields=thumbnail_url,image_url,object_story_spec&access_token=${META_ACCESS_TOKEN}`
+      );
+      const d2 = await r2.json();
+      console.log("Creative thumbnails response sample:", JSON.stringify(Object.entries(d2).slice(0, 2)));
+
+      // Mapeo creativeId → url
+      const creativeToUrl = {};
+      for (const [cid, cData] of Object.entries(d2)) {
+        const url =
+          cData?.thumbnail_url ||
+          cData?.image_url ||
+          cData?.object_story_spec?.video_data?.image_url ||
+          cData?.object_story_spec?.link_data?.picture ||
+          null;
+        creativeToUrl[cid] = url;
+      }
+
+      // Paso 3: si aún no hay URL, intentar via video picture
+      const pendingVideos = [];
+      for (const [cid, cData] of Object.entries(d2)) {
+        if (!creativeToUrl[cid]) {
+          const videoId = cData?.object_story_spec?.video_data?.video_id;
+          if (videoId) pendingVideos.push({ cid, videoId });
+        }
+      }
+      for (const { cid, videoId } of pendingVideos) {
         try {
           const vRes = await fetch(
             `https://graph.facebook.com/v19.0/${videoId}?fields=picture&access_token=${META_ACCESS_TOKEN}`
           );
           const vData = await vRes.json();
-          if (vData.picture) thumbnailMap[adId] = vData.picture;
+          if (vData.picture) creativeToUrl[cid] = vData.picture;
         } catch (ve) {
           console.error(`Error fetching video picture ${videoId}:`, ve.message);
         }
+      }
+
+      // Asignar thumbnail a cada adId
+      for (const [adId, cid] of Object.entries(adToCreative)) {
+        if (creativeToUrl[cid]) thumbnailMap[adId] = creativeToUrl[cid];
       }
     } catch (e) {
       console.error("Error fetching thumbnails batch:", e.message);
