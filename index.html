@@ -88,6 +88,7 @@
     }
     tr:hover td { background: #fafafa; }
 
+    /* Thumbnail */
     .ad-thumb {
       width: 48px;
       height: 48px;
@@ -106,6 +107,7 @@
       font-size: 18px;
     }
 
+    /* Estado badges */
     .badge {
       display: inline-block;
       padding: 3px 9px;
@@ -116,6 +118,7 @@
     .badge-tractor     { background: #d4edda; color: #1a6e2e; }
     .badge-prometedor  { background: #fff3cd; color: #7a4f00; }
     .badge-atencion    { background: #ffe0b2; color: #8d3200; }
+    .badge-pausar      { background: #b91c1c; color: #fff; }
     .badge-cerrador    { background: #d0e4ff; color: #0040a0; }
     .badge-no_suma     { background: #fde8e8; color: #b91c1c; }
     .badge-sin_evaluar { background: #f0f0f0; color: #777; }
@@ -135,7 +138,7 @@
 <header>
   <div>
     <h1>👶 Baby Ginos — Ads Reader</h1>
-    <span id="last-updated">Cargando</span>
+    <span id="last-updated">Cargando…</span>
   </div>
   <button class="refresh-btn" onclick="loadAds()">↻ Actualizar</button>
 </header>
@@ -151,7 +154,7 @@
         <th onclick="sortBy('name')">Nombre <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('campaign')">Campaña <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('status')">Estado actual <span class="sort-icon">↕</span></th>
-        <th>Estado hace 7 dias</th>
+        <th>Estado hace 7 días</th>
         <th onclick="sortBy('spend')">Gasto $ARS <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('cpm')">CPM <span class="sort-icon">↕</span></th>
         <th onclick="sortBy('frequency')">Frecuencia <span class="sort-icon">↕</span></th>
@@ -160,7 +163,7 @@
       </tr>
       <tr class="header-filters">
         <th></th>
-        <th><input type="text" id="f-name" placeholder="buscar" oninput="renderTable()" /></th>
+        <th><input type="text" id="f-name" placeholder="buscar…" oninput="renderTable()" /></th>
         <th><select id="f-campaign" onchange="renderTable()"><option value="">Todas</option></select></th>
         <th>
           <select id="f-status" onchange="renderTable()">
@@ -168,6 +171,7 @@
             <option value="tractor">🚜 Tractor</option>
             <option value="prometedor">⭐ Prometedor</option>
             <option value="atencion">⚠️ Atención</option>
+            <option value="pausar">🛑 Pausar</option>
             <option value="cerrador">🔒 Cerrador</option>
             <option value="no_suma">❌ No suma</option>
             <option value="sin_evaluar">⬜ Sin evaluar</option>
@@ -179,6 +183,7 @@
             <option value="tractor">🚜 Tractor</option>
             <option value="prometedor">⭐ Prometedor</option>
             <option value="atencion">⚠️ Atención</option>
+            <option value="pausar">🛑 Pausar</option>
             <option value="cerrador">🔒 Cerrador</option>
             <option value="no_suma">❌ No suma</option>
             <option value="sin_evaluar">⬜ Sin evaluar</option>
@@ -212,6 +217,7 @@ const STATUS_LABELS = {
   tractor:     '🚜 Tractor',
   prometedor:  '⭐ Prometedor',
   atencion:    '⚠️ Atención',
+  pausar:      '🛑 Pausar',
   cerrador:    '🔒 Cerrador',
   no_suma:     '❌ No suma',
   sin_evaluar: '⬜ Sin evaluar',
@@ -220,22 +226,24 @@ const STATUS_LABELS = {
 async function loadAds() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('ads-table').style.display = 'none';
-  document.getElementById('last-updated').textContent = 'Actualizando';
+  document.getElementById('last-updated').textContent = 'Actualizando…';
   try {
     const res = await fetch(API);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
     allAds = json.ads || [];
+
     const campaigns = [...new Set(allAds.map(a => a.campaign).filter(Boolean))].sort();
     const sel = document.getElementById('f-campaign');
     sel.innerHTML = '<option value="">Todas</option>' +
       campaigns.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+
     document.getElementById('last-updated').textContent =
       'Actualizado: ' + new Date().toLocaleString('es-AR');
     renderTable();
   } catch (e) {
     const el = document.getElementById('loading');
-    el.textContent = 'Error: ' + e.message;
+    el.textContent = '⚠️ Error: ' + e.message;
     el.className = 'error';
   }
 }
@@ -255,11 +263,11 @@ function cpaLabel(cpa) {
   return 'rojo';
 }
 function fmt(n, dec = 0) {
-  if (n == null || n === '') return '-';
+  if (n == null || n === '') return '—';
   return Number(n).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 function fmtARS(n) {
-  if (n == null || n === '') return '-';
+  if (n == null || n === '') return '—';
   return '$' + fmt(n, 0);
 }
 function sortBy(key) {
@@ -268,11 +276,11 @@ function sortBy(key) {
   renderTable();
 }
 function statusBadge(s) {
-  if (!s) return '<span class="dim">-</span>';
+  if (!s) return '<span class="dim">—</span>';
   return '<span class="badge badge-' + s + '">' + (STATUS_LABELS[s] || s) + '</span>';
 }
 function thumbCell(url) {
-  if (url) return '<img class="ad-thumb" src="' + url + '" loading="lazy" onerror="this.style.display=\'none\'"/>';
+  if (url) return '<img class="ad-thumb" src="' + url + '" loading="lazy" onerror="this.parentNode.innerHTML=\'<div class=thumb-placeholder>🖼️</div>\'"/>';
   return '<div class="thumb-placeholder">🖼️</div>';
 }
 
@@ -293,8 +301,8 @@ function renderTable() {
   });
 
   rows.sort((a, b) => {
-    const av = a[sortKey] != null ? a[sortKey] : '';
-    const bv = b[sortKey] != null ? b[sortKey] : '';
+    const av = a[sortKey] ?? '';
+    const bv = b[sortKey] ?? '';
     if (av < bv) return -sortDir;
     if (av > bv) return sortDir;
     return 0;
@@ -315,15 +323,15 @@ function renderTable() {
       const cc = cpaColor(ad.cpa);
       return '<tr>' +
         '<td>' + thumbCell(ad.thumbnail_url) + '</td>' +
-        '<td title="' + (ad.ad_id || '') + '">' + (ad.name || '-') + '</td>' +
-        '<td>' + (ad.campaign || '-') + '</td>' +
+        '<td title="' + (ad.ad_id || '') + '">' + (ad.name || '—') + '</td>' +
+        '<td>' + (ad.campaign || '—') + '</td>' +
         '<td>' + statusBadge(ad.status) + '</td>' +
         '<td>' + statusBadge(ad.prev_status) + '</td>' +
         '<td>' + fmtARS(ad.spend) + '</td>' +
         '<td>' + fmtARS(ad.cpm) + '</td>' +
         '<td>' + fmt(ad.frequency, 2) + '</td>' +
         '<td class="' + cc + '">' + fmtARS(ad.cpa) + '</td>' +
-        '<td>' + (ad.results != null ? ad.results : '-') + '</td>' +
+        '<td>' + (ad.results ?? '—') + '</td>' +
         '</tr>';
     }).join('');
   }
