@@ -8,30 +8,38 @@ export const handler = async () => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-  // Tomar los primeros 3 ad_ids de la DB
   const { data: ads } = await supabase.from("ads").select("ad_id, ad_name").limit(3);
   if (!ads?.length) return { statusCode: 200, headers, body: JSON.stringify({ error: "no ads" }) };
 
-  const ids = ads.map(a => a.ad_id).join(",");
-  const result = { adIds: ids, steps: [] };
+  const adIds = ads.map(a => a.ad_id);
+  const result = { adIds, steps: [] };
 
-  // Paso 1: pedir creative IDs
-  const r1 = await fetch(
-    `https://graph.facebook.com/v19.0/?ids=${ids}&fields=creative&access_token=${META_ACCESS_TOKEN}`
-  );
+  // Paso 1: batch para obtener creative IDs
+  const batchReq1 = adIds.map(adId => ({ method: "GET", relative_url: `${adId}?fields=creative` }));
+  const r1 = await fetch("https://graph.facebook.com/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ access_token: META_ACCESS_TOKEN, batch: JSON.stringify(batchReq1) }),
+  });
   const d1 = await r1.json();
   result.steps.push({ step: "1_creative_ids", response: d1 });
 
-  // Paso 2: si hay creativeIds, pedir thumbnails
-  const creativeIds = Object.values(d1)
-    .map(ad => ad?.creative?.id)
+  // Paso 2: obtener thumbnails de cada creative
+  const creativeIds = d1
+    .filter(item => item?.code === 200)
+    .map(item => JSON.parse(item.body)?.creative?.id)
     .filter(Boolean);
 
   if (creativeIds.length) {
-    const cIds = creativeIds.join(",");
-    const r2 = await fetch(
-      `https://graph.facebook.com/v19.0/?ids=${cIds}&fields=thumbnail_url,image_url,object_story_spec&access_token=${META_ACCESS_TOKEN}`
-    );
+    const batchReq2 = creativeIds.map(cid => ({
+      method: "GET",
+      relative_url: `${cid}?fields=thumbnail_url,image_url,object_story_spec`,
+    }));
+    const r2 = await fetch("https://graph.facebook.com/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ access_token: META_ACCESS_TOKEN, batch: JSON.stringify(batchReq2) }),
+    });
     const d2 = await r2.json();
     result.steps.push({ step: "2_creative_thumbnails", response: d2 });
   }
